@@ -103,6 +103,7 @@ local function nbt2string(nbt)
     local err, bak = pcall(function()
         return nbt:toSNBT(2)
     end)
+    --log(err,"",bak)
     if err then
         return bak
     else
@@ -112,8 +113,11 @@ end
 local function setnbt(nbt, path, value)
     local nbt_list = {nbt}
     if path then
-        path = path:gsub("^!", ""):gsub("%.", "/"):gsub("^%/", ""):split("/")
+        path = path:gsub("^!", ""):gsub("%.", "/"):gsub("^%/", ""):gsub("%/$",""):split("/")
         for d, k in ipairs(path) do
+            if k:find("^!") then
+                k=tonumber(k:sub(2,-1))
+            end
             table.insert(nbt_list, nbt_list[#nbt_list]:getTag(k))
         end
     end
@@ -127,7 +131,7 @@ local function setnbt(nbt, path, value)
         else
             -- log(dump({d, value, nbt_list, path}))
             nbt_list[#nbt_list - 1]:setTag(path[#path],
-                NBT.parseSNBT(string.format("{\"value\":}", value)):getTag("value"))
+                NBT.parseSNBT(string.format("{\"value\":%s}", value)):getTag("value"))
             for d = #nbt_list - 1, 1, -1 do
                 nbt_list[d] = nbt_list[d]:setTag(path[d], nbt_list[d + 1])
                 -- log(dump({d, k, nbt_list, path}))
