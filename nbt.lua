@@ -13,8 +13,9 @@ local help = [[
 ]]
 
 -- #>
-local NIL = {} -- 这两个是调试用的
-function dump(o)
+local NIL = {}
+
+function dump(o) -- 这个是调试用的
     local t = {}
     local _t = {}
     local _n = {}
@@ -72,7 +73,7 @@ function dump(o)
     return table.concat(t)
 end
 
-function string:split(delimiter)
+function string:split(delimiter) -- 拆分字符串
     local input = tostring(self)
     delimiter = tostring(delimiter)
     if delimiter == "" or self == "" then
@@ -89,7 +90,7 @@ function string:split(delimiter)
     return arr
 end
 
-local function nbt2string(nbt)
+local function nbt2string(nbt) -- 标签转snbt，列表转json
     --[[
     local t = nbt:getType()
     if t == NBT.Compound then
@@ -110,12 +111,13 @@ local function nbt2string(nbt)
         return nbt:toString(2)
     end
 end
-local function setnbt(nbt, path, value)
-    local nbt_list = {nbt}
+
+local function setnbt(nbt, path, value) -- 设置nbt，获取路径
+    local nbt_list = {nbt} -- 每层的nbt
     if path then
-        path = path:gsub("^!", ""):gsub("%.", "/"):gsub("^%/", ""):gsub("%/$", ""):split("/")
-        for d, k in ipairs(path) do
-            if k:find("^!") then
+        path = path:gsub("^!", ""):gsub("%.", "/"):gsub("^%/", ""):gsub("%/$", ""):split("/") -- 路径转列表
+        for d, k in ipairs(path) do -- 逐层提取nbt
+            if k:find("^!") then -- 数字索引模式
                 k = tonumber(k:sub(2, -1))
             end
             -- log(dump(nbt_list, nbt_list[#nbt_list]:getTag(k)))
@@ -125,7 +127,7 @@ local function setnbt(nbt, path, value)
     if value then
         if value == NIL then
             nbt_list[#nbt_list - 1]:removeTag(path[#path])
-            for d = #nbt_list - 2, 1, -1 do
+            for d = #nbt_list - 2, 1, -1 do -- 逐层塞回去
                 nbt_list[d] = nbt_list[d]:setTag(path[d], nbt_list[d + 1])
                 -- log(dump({d, k, nbt_list, path}))
             end
@@ -133,7 +135,7 @@ local function setnbt(nbt, path, value)
             -- log(dump({d, value, nbt_list, path}))
             nbt_list[#nbt_list - 1]:setTag(path[#path],
                 NBT.parseSNBT(string.format("{\"value\":%s}", value)):getTag("value"))
-            for d = #nbt_list - 1, 1, -1 do
+            for d = #nbt_list - 1, 1, -1 do -- 逐层塞回去
                 nbt_list[d] = nbt_list[d]:setTag(path[d], nbt_list[d + 1])
                 -- log(dump({d, k, nbt_list, path}))
             end
@@ -143,11 +145,21 @@ local function setnbt(nbt, path, value)
         return nbt_list[#nbt_list]
     end
 end
-local function nbt2world(thing, nbt)
-    log(type(thing))
+
+local function nbt2world(thing, nbt, res) -- 应用至世界
+    log("backup:to: ", nbt:toSNBT())
+    return thing:setNbt(nbt)
+    --[[
+    if res.Block and (not res.Path:find("^!")) and false then
+        log(res.Block.x, " ", res.Block.y, " ", res.Block.z, " ", res.Block.dimid)
+        return mc.setBlock(res.Block, nbt)
+    else
+        return thing:setNbt(nbt)
+    end
+    --]]
 end
 
-local funs = {
+local funs = { -- 枚举每个操作
     show = function(thing, res)
         if thing then
             return nbt2string(setnbt(thing:getNbt(), res.Path))
@@ -173,17 +185,13 @@ local funs = {
         local nbt = thing:getNbt()
         log("backup:set: ", nbt:toSNBT())
         nbt = setnbt(nbt, res.Path, res.Value)
-        log("backup:to: ", nbt:toSNBT())
-        nbt2world(thing, nbt)
-        return thing:setNbt(nbt)
+        return nbt2world(thing, nbt, res)
     end,
     del = function(thing, res)
         local nbt = thing:getNbt()
         log("backup:del: ", nbt:toSNBT())
         nbt = setnbt(nbt, res.Path, NIL)
-        log("backup:to: ", nbt:toSNBT())
-        nbt2world(thing, nbt)
-        return thing:setNbt(nbt)
+        return nbt2world(thing, nbt, res)
     end
 }
 
@@ -196,7 +204,7 @@ nbt_c:mandatory("Entity", ParamType.Actor)
 nbt_c:mandatory("Player", ParamType.Player)
 
 nbt_c:mandatory("Path", ParamType.String)
-nbt_c:optional("Value", ParamType.RawText)
+nbt_c:optional("Value", ParamType.String)
 
 -- help
 nbt_c:overload({"Action"})
@@ -214,7 +222,7 @@ nbt_c:setCallback(function(cmd, origin, output, results)
         output:success(help)
     elseif results.Block then -- Block
         local block = mc.getBlock(results.Block)
-        if results.Path and results.Path:find("^!") then
+        if results.Path and results.Path:find("^!") then -- 方块实体模式
             block = block:getBlockEntity()
         end
         output:success(tostring(funs[results.Action](block, results)))
