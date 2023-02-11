@@ -12,12 +12,14 @@ local help = [[
     这东西很危险，用之前先备份！！！
 ]]
 
+-- #>
 local NIL = {} -- 这两个是调试用的
 function dump(o)
     local t = {}
     local _t = {}
     local _n = {}
-    local space, deep = string.rep(' ', 2), 0
+    local deepin = 4
+    local space, deep = ' ', 0
     local function _ToString(o, _k)
         if type(o) == ('number') then
             table.insert(t, o)
@@ -28,21 +30,20 @@ function dump(o)
             if mt and mt.__tostring then
                 table.insert(t, tostring(o))
             else
-                deep = deep + 2
+                deep = deep + deepin
                 table.insert(t, '{')
-
                 for k, v in pairs(o) do
                     if v == _G then
-                        table.insert(t, string.format('\r\n%s%s\t=%s ;', string.rep(space, deep - 1), k, "_G"))
+                        table.insert(t, string.format('\n%s%s\t= %s;', string.rep(space, deep), k, "_G"))
                     elseif v ~= package.loaded then
                         if tonumber(k) then
                             k = string.format('[%s]', k)
                         else
                             k = string.format('[\"%s\"]', k)
                         end
-                        table.insert(t, string.format('\r\n%s%s\t= ', string.rep(space, deep - 1), k))
+                        table.insert(t, string.format('\n%s%s\t= ', string.rep(space, deep), k))
                         if v == NIL then
-                            table.insert(t, string.format('%s ;', "nil"))
+                            table.insert(t, string.format('%s;', "nil"))
                         elseif type(v) == ('table') then
                             if _t[tostring(v)] == nil then
                                 _t[tostring(v)] = v
@@ -58,16 +59,15 @@ function dump(o)
                         end
                     end
                 end
-                table.insert(t, string.format('\r\n%s}', string.rep(space, deep - 1)))
-                deep = deep - 2
+                deep = deep - deepin
+                table.insert(t, string.format('\n%s}', string.rep(space, deep)))
             end
         else
             table.insert(t, tostring(o))
         end
-        table.insert(t, " ;")
+        table.insert(t, ";")
         return t
     end
-
     t = _ToString(o, '')
     return table.concat(t)
 end
@@ -103,7 +103,7 @@ local function nbt2string(nbt)
     local err, bak = pcall(function()
         return nbt:toSNBT(2)
     end)
-    --log(err,"",bak)
+    -- log(err,"",bak)
     if err then
         return bak
     else
@@ -113,11 +113,12 @@ end
 local function setnbt(nbt, path, value)
     local nbt_list = {nbt}
     if path then
-        path = path:gsub("^!", ""):gsub("%.", "/"):gsub("^%/", ""):gsub("%/$",""):split("/")
+        path = path:gsub("^!", ""):gsub("%.", "/"):gsub("^%/", ""):gsub("%/$", ""):split("/")
         for d, k in ipairs(path) do
             if k:find("^!") then
-                k=tonumber(k:sub(2,-1))
+                k = tonumber(k:sub(2, -1))
             end
+            -- log(dump(nbt_list, nbt_list[#nbt_list]:getTag(k)))
             table.insert(nbt_list, nbt_list[#nbt_list]:getTag(k))
         end
     end
@@ -142,6 +143,9 @@ local function setnbt(nbt, path, value)
         return nbt_list[#nbt_list]
     end
 end
+local function nbt2world(thing, nbt)
+    log(type(thing))
+end
 
 local funs = {
     show = function(thing, res)
@@ -155,7 +159,7 @@ local funs = {
         if thing then
             local nbt = setnbt(thing:getNbt(), res.Path)
             if nbt:getType() == NBT.Compound then
-                return data.toJson(nbt:getKeys(), 2)
+                return table.concat(nbt:getKeys(), "  ")
             elseif nbt:getType() == NBT.List() then
                 return nbt2string(nbt)
             else
@@ -166,10 +170,20 @@ local funs = {
         end
     end,
     set = function(thing, res)
-        return thing:setNbt(setnbt(thing:getNbt(), res.Path, res.Value))
+        local nbt = thing:getNbt()
+        log("backup:set: ", nbt:toSNBT())
+        nbt = setnbt(nbt, res.Path, res.Value)
+        log("backup:to: ", nbt:toSNBT())
+        nbt2world(thing, nbt)
+        return thing:setNbt(nbt)
     end,
     del = function(thing, res)
-        return thing:setNbt(setnbt(thing:getNbt(), res.Path, NIL))
+        local nbt = thing:getNbt()
+        log("backup:del: ", nbt:toSNBT())
+        nbt = setnbt(nbt, res.Path, NIL)
+        log("backup:to: ", nbt:toSNBT())
+        nbt2world(thing, nbt)
+        return thing:setNbt(nbt)
     end
 }
 
