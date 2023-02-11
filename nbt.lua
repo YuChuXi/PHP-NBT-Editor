@@ -12,6 +12,7 @@ local help = [[
     这东西很危险，用之前先备份！！！
 ]]
 
+local backup = File("logs/nbt/backup.log", file.AppendMode)
 -- #>
 local NIL = {}
 
@@ -90,17 +91,26 @@ function string:split(delimiter) -- 拆分字符串
     return arr
 end
 
+local function back2file(str, thing) -- 备份
+    backup:write(os.date("\n%x/%X BACKUP [" .. thing .. "] "), function()
+        backup:write(str, function()
+            backup:flush()
+        end)
+    end)
+end
+
 local function nbt2string(nbt) -- 标签转snbt，列表转json
-    --[[
+    -- [[
     local t = nbt:getType()
     if t == NBT.Compound then
         return nbt:toJson(2)
     elseif t == NBT.List then
-        return data.toJson(nbt:toArray(), 2)
+        return nbt:toString(2)
     else
         return tostring(nbt:get())
     end
-    --]]
+    -- ]]
+    --[[
     local err, bak = pcall(function()
         return nbt:toSNBT(2)
     end)
@@ -110,6 +120,7 @@ local function nbt2string(nbt) -- 标签转snbt，列表转json
     else
         return nbt:toString(2)
     end
+    --]]
 end
 
 local function setnbt(nbt, path, value) -- 设置nbt，获取路径
@@ -147,7 +158,7 @@ local function setnbt(nbt, path, value) -- 设置nbt，获取路径
 end
 
 local function nbt2world(thing, nbt, res) -- 应用至世界
-    log("backup:to: ", nbt:toSNBT())
+    back2file(nbt:toSNBT(), "ToWorld")
     return thing:setNbt(nbt)
     --[[
     if res.Block and (not res.Path:find("^!")) and false then
@@ -162,9 +173,9 @@ end
 local funs = { -- 枚举每个操作
     show = function(thing, res)
         if thing then
-            local nbt = setnbt(thing:getNbt(), res.Path)
-            log("backup:show: ", nbt:toSNBT())
-            return nbt2string(nbt)
+            local snbt = nbt2string(setnbt(thing:getNbt(), res.Path))
+            back2file(snbt, "Show")
+            return snbt
         else
             return "NULL"
         end
@@ -186,7 +197,7 @@ local funs = { -- 枚举每个操作
     set = function(thing, res)
         if thing then
             local nbt = thing:getNbt()
-            log("backup:set: ", nbt:toSNBT())
+            back2file(nbt2string(nbt), "Set")
             nbt = setnbt(nbt, res.Path, res.Value)
             return nbt2world(thing, nbt, res)
         else
@@ -196,7 +207,7 @@ local funs = { -- 枚举每个操作
     del = function(thing, res)
         if thing then
             local nbt = thing:getNbt()
-            log("backup:del: ", nbt:toSNBT())
+            back2file(nbt2string(nbt), "Del")
             nbt = setnbt(nbt, res.Path, NIL)
             return nbt2world(thing, nbt, res)
         else
