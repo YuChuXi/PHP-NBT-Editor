@@ -162,7 +162,9 @@ end
 local funs = { -- 枚举每个操作
     show = function(thing, res)
         if thing then
-            return nbt2string(setnbt(thing:getNbt(), res.Path))
+            local nbt = setnbt(thing:getNbt(), res.Path)
+            log("backup:show: ", nbt:toSNBT())
+            return nbt2string(nbt)
         else
             return "NULL"
         end
@@ -182,16 +184,24 @@ local funs = { -- 枚举每个操作
         end
     end,
     set = function(thing, res)
-        local nbt = thing:getNbt()
-        log("backup:set: ", nbt:toSNBT())
-        nbt = setnbt(nbt, res.Path, res.Value)
-        return nbt2world(thing, nbt, res)
+        if thing then
+            local nbt = thing:getNbt()
+            log("backup:set: ", nbt:toSNBT())
+            nbt = setnbt(nbt, res.Path, res.Value)
+            return nbt2world(thing, nbt, res)
+        else
+            return "NULL"
+        end
     end,
     del = function(thing, res)
-        local nbt = thing:getNbt()
-        log("backup:del: ", nbt:toSNBT())
-        nbt = setnbt(nbt, res.Path, NIL)
-        return nbt2world(thing, nbt, res)
+        if thing then
+            local nbt = thing:getNbt()
+            log("backup:del: ", nbt:toSNBT())
+            nbt = setnbt(nbt, res.Path, NIL)
+            return nbt2world(thing, nbt, res)
+        else
+            return "NULL"
+        end
     end
 }
 
